@@ -1,0 +1,83 @@
+homeassistant:
+  customize:
+    sensor.duet_status:
+      friendly_name: '3D Printer Status'
+      icon: mdi:printer-3d
+
+sensor:
+  - platform: rest
+    name: Duet Status
+    resource: http://192.168.1.150/rr_status?type=3
+    value_template: '{{ value_json.status }}'
+    json_attributes:
+      - temps
+      - currentLayer
+      - fractionPrinted
+      - printDuration
+      - timesLeft
+      
+  - platform: template
+    sensors:
+      head_temp_current:
+        friendly_name: "Nozzle Temperature Current"
+        value_template: '{{ states.sensor.duet_status.attributes.temps.current[1] }}'
+        unit_of_measurement: "°C"
+      head_temp_active:
+        friendly_name: "Nozzle Temperature Active"
+        value_template: '{{ states.sensor.duet_status.attributes.temps.tools.active[0][0] }}'
+        unit_of_measurement: "°C"
+      bed_temp_current:
+        friendly_name: "Bed Temperature Current"
+        value_template: '{{ states.sensor.duet_status.attributes.temps.current[0] }}'
+        unit_of_measurement: "°C"
+      bed_temp_active:
+        friendly_name: "Bed Temperature Active"
+        value_template: '{{ states.sensor.duet_status.attributes.temps.bed.active }}'
+        unit_of_measurement: "°C"
+      print_percentage:
+        friendly_name: "Percentage Printed"
+        value_template: '{{ states.sensor.duet_status.attributes.fractionPrinted }}'
+        unit_of_measurement: "%"
+      print_duration:
+        friendly_name: "Time Printed"
+        value_template: '{{ states.sensor.duet_status.attributes.printDuration // 60 }}'
+        unit_of_measurement: "min"
+      print_timeleft:
+        friendly_name: "Est Time Left"
+        value_template: '{{ states.sensor.duet_status.attributes.timesLeft.filament // 60 }}'
+        unit_of_measurement: "min"
+
+group:
+  3dprinter:
+    name: Ender5
+    entities:
+      - sensor.duet_status
+      - sensor.head_temp_current
+      - sensor.head_temp_active
+      - sensor.bed_temp_current
+      - sensor.bed_temp_active
+      - sensor.print_percentage
+  3dprintstats:
+    
+
+automation:
+  - id: print_finished
+    alias: Print Finished
+    trigger:
+      platform: state
+      entity_id: sensor.duet_status
+      from: 'P'
+    action:
+      - service: notify.slack
+        data_template: 
+          message: ':printer: 3D Print is Finished'
+  - id: print_started
+    alias: Print Started
+    trigger:
+      platform: state
+      entity_id: sensor.duet_status
+      from: 'I'
+    action:
+      - service: notify.slack
+        data_template: 
+          message: ':printer: 3D Print has Started'
